@@ -1,0 +1,39 @@
+{
+  "name": "ecos-del-doblaje-installer",
+  "version": "1.0.0",
+  "description": "Instalador del doblaje al castellano para Lies of P",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never"
+  },
+  "author": "Ecos del Doblaje",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "dependencies": {
+    "fs-extra": "^11.1.1"
+  },
+  "build": {
+    "appId": "com.ecosdeldoblaje.liesofp.installer",
+    "productName": "Ecos del Doblaje - Lies of P",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "LiesOfP-EcosDelDoblaje.exe"
+    }
+  }
+}

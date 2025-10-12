@@ -15,6 +15,7 @@
     "electron-builder": "^24.6.4"
   },
   "dependencies": {
+    "axios": "^1.12.2",
     "fs-extra": "^11.1.1"
   },
   "build": {

@@ -11,6 +11,7 @@ out/
 
 # Electron build artifacts
 *.exe
+!assets/UnRAR.exe
 *.dmg
 *.AppImage
 *.deb

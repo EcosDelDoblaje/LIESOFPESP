@@ -3,6 +3,10 @@ const path = require('path');
 const fs = require('fs-extra');
 const { spawn, exec } = require('child_process');
 const os = require('os');
+const axios = require('axios');
+const https = require('https');
+const http = require('http');
+// Using bundled UnRAR.exe instead of Node.js dependencies
 
 // Function to get all available drives on Windows
 async function getAvailableDrives() {
@@ -364,6 +368,342 @@ async function findCommonInstallations() {
   return installations;
 }
 
+// Download function with progress tracking using axios
+async function downloadFile(url, outputPath, onProgress) {
+  const startTime = Date.now();
+  
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: url,
+      responseType: 'stream',
+      timeout: 300000,
+      headers: {
+        'User-Agent': 'Lies-of-P-Installer/1.0.0'
+      }
+    });
+
+    const totalBytes = parseInt(response.headers['content-length'], 10);
+    let downloadedBytes = 0;
+
+    const writer = fs.createWriteStream(outputPath);
+
+    response.data.on('data', (chunk) => {
+      downloadedBytes += chunk.length;
+      const elapsed = (Date.now() - startTime) / 1000;
+      const speed = downloadedBytes / elapsed;
+      const percentage = totalBytes ? (downloadedBytes / totalBytes) * 100 : 0;
+
+      if (onProgress) {
+        onProgress({
+          downloadedBytes,
+          totalBytes,
+          percentage,
+          speed,
+          elapsed
+        });
+      }
+    });
+
+    response.data.pipe(writer);
+
+    return new Promise((resolve, reject) => {
+      writer.on('finish', () => {
+        writer.close();
+        // Longer delay to ensure file is released
+        setTimeout(resolve, 500);
+      });
+
+      writer.on('error', (err) => {
+        writer.close();
+        fs.unlink(outputPath, () => {});
+        reject(err);
+      });
+    });
+  } catch (error) {
+    console.error('Download error:', error);
+    throw new Error(`Error descargando archivo: ${error.message}`);
+  }
+}
+
+// Extract RAR file using bundled UnRAR.exe with multiple fallback options
+async function extractRarFile(rarPath, extractPath) {
+  try {
+    console.log(`Extracting RAR file: ${rarPath} to ${extractPath}`);
+    
+    // Ensure extract directory exists
+    await fs.ensureDir(extractPath);
+    
+    // Find UnRAR.exe first
+    const possibleUnRARPaths = [
+      path.join(process.cwd(), 'assets', 'UnRAR.exe'),
+      path.join(__dirname, '..', 'assets', 'UnRAR.exe'),
+      path.join(process.resourcesPath, 'assets', 'UnRAR.exe'),
+      path.join(process.resourcesPath, 'app', 'assets', 'UnRAR.exe')
+    ];
+    
+    let unrarPath = null;
+    for (const testPath of possibleUnRARPaths) {
+      if (await fs.pathExists(testPath)) {
+        unrarPath = testPath;
+        console.log('✅ Found UnRAR.exe at:', unrarPath);
+        break;
+      } else {
+        console.log('❌ Not found at:', testPath);
+      }
+    }
+    
+    if (!unrarPath) {
+      throw new Error('UnRAR.exe not found in any location');
+    }
+    
+    // Execute UnRAR directly with the found path
+    const command = `"${unrarPath}" x -y "${rarPath}" "${extractPath}\\"`;
+    console.log('Executing command:', command);
+    
+    await new Promise((resolve, reject) => {
+      exec(command, { timeout: 600000, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+        if (error) {
+          console.error('UnRAR error:', error);
+          console.error('stderr:', stderr);
+          reject(error);
+        } else {
+          console.log('UnRAR stdout:', stdout);
+          resolve();
+        }
+      });
+    });
+    
+    console.log('RAR extraction completed successfully');
+  } catch (error) {
+    console.error('Error during RAR extraction:', error);
+    throw new Error(`Error extrayendo archivo RAR: ${error.message}`);
+  }
+}
+
+// Extract using UnRAR with multiple fallback options
+async function extractWithUnRAR(rarPath, extractPath) {
+  console.log('Using UnRAR for RAR extraction (best for split archives)');
+
+  const extractionTools = [
+    // UnRAR.exe (MEJOR OPCIÓN - diseñado específicamente para RAR)
+    // Modo desarrollo - ruta directa
+    { path: path.join(process.cwd(), 'assets', 'UnRAR.exe'), type: 'unrar' },
+    { path: path.join(__dirname, '..', 'assets', 'UnRAR.exe'), type: 'unrar' },
+    // Modo empaquetado
+    { path: path.join(process.resourcesPath, 'app', 'assets', 'UnRAR.exe'), type: 'unrar' },
+    { path: path.join(process.resourcesPath, 'assets', 'UnRAR.exe'), type: 'unrar' },
+    // WinRAR (si está instalado)
+    { path: 'C:\\Program Files\\WinRAR\\unrar.exe', type: 'unrar' },
+    { path: 'C:\\Program Files (x86)\\WinRAR\\unrar.exe', type: 'unrar' },
+    { path: 'C:\\Program Files\\WinRAR\\WinRAR.exe', type: 'winrar' },
+    { path: 'C:\\Program Files (x86)\\WinRAR\\WinRAR.exe', type: 'winrar' },
+    // 7-Zip (como fallback)
+    { path: 'C:\\Program Files\\7-Zip\\7z.exe', type: '7zip' },
+    { path: 'C:\\Program Files (x86)\\7-Zip\\7z.exe', type: '7zip' },
+    { path: path.join(__dirname, '..', 'assets', '7za.exe'), type: '7zip' }
+  ];
+
+  let lastError = null;
+
+  console.log('Current working directory:', process.cwd());
+  console.log('__dirname:', __dirname);
+  console.log('process.resourcesPath:', process.resourcesPath);
+
+  for (const tool of extractionTools) {
+    try {
+      console.log(`\n=== Trying ${tool.type.toUpperCase()} ===`);
+      console.log(`Path: ${tool.path}`);
+      
+      // Check if the executable exists
+      if (tool.path.includes('\\') || tool.path.includes('/')) {
+        const exists = await fs.pathExists(tool.path);
+        console.log(`File exists check: ${exists}`);
+        if (!exists) {
+          console.log(`❌ File not found: ${tool.path}`);
+          continue;
+        }
+        console.log(`✅ Found: ${tool.path}`);
+      }
+      
+      // Use appropriate extraction method
+      await extractWithTool(tool, rarPath, extractPath);
+
+      console.log(`Successfully extracted using ${tool.type.toUpperCase()} at: ${tool.path}`);
+      return; // Success, exit function
+      
+    } catch (error) {
+      console.warn(`Failed with ${tool.type.toUpperCase()} at ${tool.path}:`, error.message);
+      lastError = error;
+      continue; // Try next path
+    }
+  }
+
+  // If all attempts failed, try manual command line extraction
+  try {
+    console.log('Trying manual command line extraction...');
+    await extractWithCommandLine(rarPath, extractPath);
+  } catch (cmdError) {
+    console.error('Command line extraction also failed:', cmdError);
+    throw new Error(`No se pudo extraer el archivo. Último error: ${lastError?.message || cmdError.message}`);
+  }
+}
+
+// Extract with appropriate tool based on type
+async function extractWithTool(tool, rarPath, extractPath) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Verify RAR file is accessible before extraction
+      const stats = await fs.stat(rarPath);
+      console.log(`RAR file size: ${stats.size} bytes, modified: ${stats.mtime}`);
+      
+      // Test file access by trying to read a small portion
+      await fs.access(rarPath, fs.constants.R_OK);
+      console.log('RAR file is accessible for reading');
+    } catch (accessError) {
+      reject(new Error(`Cannot access RAR file: ${accessError.message}`));
+      return;
+    }
+
+    let command;
+    
+    if (tool.type === 'unrar') {
+      // UnRAR command: UnRAR.exe x -y "archive.rar" "output_folder\\"
+      command = `"${tool.path}" x -y "${rarPath}" "${extractPath}\\"`;    
+    } else if (tool.type === 'winrar') {
+      // WinRAR command: WinRAR.exe x -y "archive.rar" "output_folder\\"
+      command = `"${tool.path}" x -y "${rarPath}" "${extractPath}\\"`;    
+    } else {
+      // 7-Zip command: 7z.exe x "archive.rar" -o"output_folder" -y
+      command = `"${tool.path}" x "${rarPath}" -o"${extractPath}" -y`;
+    }
+    
+    console.log(`Executing ${tool.type.toUpperCase()} command: ${command}`);
+    
+    const process = exec(command, { 
+      timeout: 600000, // 10 minutes timeout
+      maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+    }, (error, stdout, stderr) => {
+      console.log(`=== ${tool.type.toUpperCase()} OUTPUT ===`);
+      console.log('STDOUT:', stdout);
+      console.log('STDERR:', stderr);
+      console.log('ERROR:', error ? error.message : 'none');
+      
+      if (error) {
+        console.error(`${tool.type.toUpperCase()} extraction error: ${error.message}`);
+        reject(new Error(`${tool.type.toUpperCase()} extraction failed: ${error.message}`));
+      } else {
+        console.log(`${tool.type.toUpperCase()} extraction completed successfully`);
+        resolve();
+      }
+    });
+    
+    // Handle process events for better debugging
+    process.on('spawn', () => {
+      console.log(`${tool.type.toUpperCase()} process spawned successfully`);
+    });
+    
+    process.on('error', (error) => {
+      console.error(`Failed to spawn ${tool.type.toUpperCase()} process:`, error);
+      reject(error);
+    });
+  });
+}
+
+// Fallback: Manual command line extraction
+async function extractWithCommandLine(rarPath, extractPath) {
+  return new Promise((resolve, reject) => {
+    // Try different command line tools for RAR (prioritize UnRAR)
+    const bundledUnRAR1 = path.join(process.cwd(), 'assets', 'UnRAR.exe');
+    const bundledUnRAR2 = path.join(__dirname, '..', 'assets', 'UnRAR.exe');
+    const bundled7za = path.join(__dirname, '..', 'assets', '7za.exe');
+    const commands = [
+      `"${bundledUnRAR1}" x -y "${rarPath}" "${extractPath}\\"`,
+      `"${bundledUnRAR2}" x -y "${rarPath}" "${extractPath}\\"`,  
+      `"${bundled7za}" x "${rarPath}" -o"${extractPath}" -y`,
+      `"C:\\Program Files\\7-Zip\\7z.exe" x "${rarPath}" -o"${extractPath}" -y`,
+      `"C:\\Program Files (x86)\\7-Zip\\7z.exe" x "${rarPath}" -o"${extractPath}" -y`,
+      `7z x "${rarPath}" -o"${extractPath}" -y` 
+    ];
+
+    let commandIndex = 0;
+
+    const tryNextCommand = () => {
+      if (commandIndex >= commands.length) {
+        reject(new Error('Todos los métodos de extracción fallaron'));
+        return;
+      }
+
+      const command = commands[commandIndex];
+      console.log(`Trying command: ${command}`);
+
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.warn(`Command failed: ${command}`, error.message);
+          commandIndex++;
+          tryNextCommand();
+        } else {
+          console.log('Manual extraction successful');
+          resolve();
+        }
+      });
+    };
+
+    tryNextCommand();
+  });
+}
+
+// Format bytes to human readable
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Format speed
+function formatSpeed(bytesPerSecond) {
+  return formatBytes(bytesPerSecond) + '/s';
+}
+
+// Create backup of existing files
+async function createBackup(sourcePath, backupPath) {
+  try {
+    if (await fs.pathExists(sourcePath)) {
+      await fs.ensureDir(path.dirname(backupPath));
+      await fs.copy(sourcePath, backupPath, { overwrite: true });
+      console.log('Backup created:', backupPath);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.warn('Could not create backup:', error.message);
+    return false;
+  }
+}
+
+// Restore backup files
+async function restoreBackup(backupPath, targetPath) {
+  try {
+    if (await fs.pathExists(backupPath)) {
+      await fs.ensureDir(path.dirname(targetPath));
+      await fs.copy(backupPath, targetPath, { overwrite: true });
+      console.log('Backup restored:', targetPath);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.warn('Could not restore backup:', error.message);
+    return false;
+  }
+}
+
+// Get backup directory path
+function getBackupDir(gamePath) {
+  return path.join(gamePath, 'LiesofP', 'Content', 'Movies', '_backup_ecos_del_doblaje');
+}
+
 let mainWindow;
 
 function createWindow() {
@@ -611,9 +951,13 @@ ipcMain.handle('install-dubbing', async (event, gamePath, installOptions = {}) =
   try {
     const steps = [
       'Verificando archivos del juego...',
+      'Descargando archivos (paralelo)...',
+      'Creando backups de archivos existentes...',
+      'Extrayendo archivos de cinemáticas...',
+      'Extrayendo archivos de splash...',
       'Creando directorio de mods...',
       'Copiando archivo de doblaje...',
-      'Verificando instalación...',
+      'Limpiando archivos temporales...',
       'Finalizando instalación...'
     ];
 
@@ -622,38 +966,168 @@ ipcMain.handle('install-dubbing', async (event, gamePath, installOptions = {}) =
       step: 1,
       total: steps.length,
       message: steps[0],
-      percentage: 20
+      percentage: 10
     });
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Check for both possible executable names
-    const gameExePath1 = path.join(gamePath, 'LiesOfP.exe');
-    const gameExePath2 = path.join(gamePath, 'LOP.exe');
-    
-    if (!await fs.pathExists(gameExePath1) && !await fs.pathExists(gameExePath2)) {
-      throw new Error('No se encontró el ejecutable de Lies of P en la ruta especificada');
-    }
+    // Create temporary directory for downloads
+    const tempDir = path.join(os.tmpdir(), 'lies-of-p-installer');
+    await fs.ensureDir(tempDir);
 
-    // Step 2: Create mods directory
+    // Define download URLs and paths
+    const downloads = [
+      {
+        url: 'https://github.com/EcosDelDoblaje/LIESOFPESP/releases/download/V1.0/Cutscene.part1.rar',
+        filename: 'Cutscene.part1.rar',
+        step: 2
+      },
+      {
+        url: 'https://github.com/EcosDelDoblaje/LIESOFPESP/releases/download/V1.0/Cutscene.part2.rar',
+        filename: 'Cutscene.part2.rar',
+        step: 3
+      },
+      {
+        url: 'https://github.com/EcosDelDoblaje/LIESOFPESP/releases/download/V1.0/Splash.rar',
+        filename: 'Splash.rar',
+        step: 4
+      }
+    ];
+
+    // Download files in parallel for better speed
     mainWindow.webContents.send('installation-progress', {
       step: 2,
       total: steps.length,
-      message: steps[1],
-      percentage: 40
+      message: 'Descargando archivos (3 descargas simultáneas)...',
+      percentage: 20
     });
-    await new Promise(resolve => setTimeout(resolve, 500));
 
-    const modsPath = path.join(gamePath, 'LiesofP', 'Content', 'Paks', '~mods');
-    await fs.ensureDir(modsPath);
+    // Track total download progress
+    let totalDownloaded = 0;
+    let totalSize = 0;
+    const downloadProgress = {};
 
-    // Step 3: Copy mod file
+    const downloadPromises = downloads.map(async (download, index) => {
+      const downloadPath = path.join(tempDir, download.filename);
+      
+      return downloadFile(download.url, downloadPath, (progress) => {
+        downloadProgress[download.filename] = progress;
+        
+        // Calculate total progress
+        let currentTotalDownloaded = 0;
+        let currentTotalSize = 0;
+        
+        Object.values(downloadProgress).forEach(p => {
+          currentTotalDownloaded += p.downloadedBytes;
+          currentTotalSize += p.totalBytes || 0;
+        });
+        
+        const overallSpeed = Object.values(downloadProgress)
+          .reduce((sum, p) => sum + (p.speed || 0), 0);
+        
+        const downloaded = formatBytes(currentTotalDownloaded);
+        const total = currentTotalSize > 0 ? formatBytes(currentTotalSize) : 'calculando...';
+        const speed = formatSpeed(overallSpeed);
+        
+        let message = 'Descargando cinemáticas y contenido';
+        if (currentTotalSize > 0) {
+          message += ` - ${downloaded}/${total} (${speed})`;
+        } else {
+          message += ` - ${downloaded} (${speed})`;
+        }
+        
+        mainWindow.webContents.send('installation-progress', {
+          step: 2,
+          total: steps.length,
+          message: message,
+          percentage: Math.round(20 + (currentTotalDownloaded / Math.max(currentTotalSize, 1)) * 20)
+        });
+      });
+    });
+
+    // Wait for all downloads to complete
+    console.log('Waiting for downloads to complete...');
+    await Promise.all(downloadPromises);
+    console.log('All downloads completed successfully');
+    
+    // Add longer delay to ensure files are completely closed and released by the OS
+    console.log('Waiting for files to be released by the system...');
+    await new Promise(resolve => setTimeout(resolve, 5000)); // 5 seconds
+    console.log('Files should be accessible now, proceeding to backup phase...');
+
+    // Step 3: Create backups of existing files
     mainWindow.webContents.send('installation-progress', {
       step: 3,
       total: steps.length,
       message: steps[2],
+      percentage: 40
+    });
+
+    const cutsceneDir = path.join(gamePath, 'LiesofP', 'Content', 'Movies', 'Cutscene');
+    const splashDir = path.join(gamePath, 'LiesofP', 'Content', 'Movies', 'Splash');
+    const backupDir = getBackupDir(gamePath);
+
+    // Simple backup: backup entire directories if they exist
+    if (await fs.pathExists(cutsceneDir)) {
+      const cutsceneBackupDir = path.join(backupDir, 'Cutscene');
+      await fs.ensureDir(cutsceneBackupDir);
+      await fs.copy(cutsceneDir, cutsceneBackupDir, { overwrite: true });
+      console.log('Cutscene directory backed up');
+    }
+    
+    if (await fs.pathExists(splashDir)) {
+      const splashBackupDir = path.join(backupDir, 'Splash');
+      await fs.ensureDir(splashBackupDir);
+      await fs.copy(splashDir, splashBackupDir, { overwrite: true });
+      console.log('Splash directory backed up');
+    }
+
+    // Step 4: Extract cutscene files directly
+    mainWindow.webContents.send('installation-progress', {
+      step: 4,
+      total: steps.length,
+      message: steps[3],
+      percentage: 55
+    });
+
+    await fs.ensureDir(cutsceneDir);
+    console.log('About to extract cutscene RAR file...');
+    console.log('RAR file path:', path.join(tempDir, 'Cutscene.part1.rar'));
+    console.log('Extract to path:', cutsceneDir);
+    console.log('Temp dir contents:', await fs.readdir(tempDir));
+    
+    await extractRarFile(path.join(tempDir, 'Cutscene.part1.rar'), cutsceneDir);
+    console.log('Cutscene files extracted successfully');
+
+    // Step 5: Extract splash files directly
+    mainWindow.webContents.send('installation-progress', {
+      step: 5,
+      total: steps.length,
+      message: steps[4],
+      percentage: 65
+    });
+
+    await fs.ensureDir(splashDir);
+    await extractRarFile(path.join(tempDir, 'Splash.rar'), splashDir);
+    console.log('Splash files extracted successfully');
+
+    // Step 6: Create mods directory
+    mainWindow.webContents.send('installation-progress', {
+      step: 6,
+      total: steps.length,
+      message: steps[5],
       percentage: 75
     });
-    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const modsPath = path.join(gamePath, 'LiesofP', 'Content', 'Paks', '~mods');
+    await fs.ensureDir(modsPath);
+
+    // Step 7: Copy mod file
+    mainWindow.webContents.send('installation-progress', {
+      step: 7,
+      total: steps.length,
+      message: steps[6],
+      percentage: 80
+    });
 
     // Install main dubbing mod
     const mainModPaths = [
@@ -775,27 +1249,33 @@ ipcMain.handle('install-dubbing', async (event, gamePath, installOptions = {}) =
       }
     }
 
-    // Step 4: Verify installation
+    // Step 8: Clean up temporary files
     mainWindow.webContents.send('installation-progress', {
-      step: 4,
+      step: 8,
       total: steps.length,
-      message: steps[3],
-      percentage: 80
+      message: steps[7],
+      percentage: 90
+    });
+
+    try {
+      await fs.remove(tempDir);
+      console.log('Temporary files cleaned up successfully');
+    } catch (cleanupError) {
+      console.warn('Could not clean up temporary files:', cleanupError.message);
+    }
+
+    // Step 9: Finalize installation
+    mainWindow.webContents.send('installation-progress', {
+      step: 9,
+      total: steps.length,
+      message: steps[8],
+      percentage: 100
     });
     await new Promise(resolve => setTimeout(resolve, 500));
 
     if (!await fs.pathExists(targetMainMod)) {
       throw new Error('Error al verificar la instalación del archivo de doblaje');
     }
-
-    // Step 5: Finalize
-    mainWindow.webContents.send('installation-progress', {
-      step: 5,
-      total: steps.length,
-      message: steps[4],
-      percentage: 100
-    });
-    await new Promise(resolve => setTimeout(resolve, 500));
 
     return { 
       success: true, 
@@ -826,6 +1306,8 @@ ipcMain.handle('uninstall-dubbing', async (event, gamePath) => {
     const steps = [
       'Verificando instalación actual...',
       'Eliminando archivo de doblaje...',
+      'Restaurando archivos de cinemáticas originales...',
+      'Restaurando archivos de splash originales...',
       'Limpiando directorios...',
       'Finalizando desinstalación...'
     ];
@@ -922,12 +1404,75 @@ ipcMain.handle('uninstall-dubbing', async (event, gamePath) => {
       }
     }
 
-    // Step 3: Clean up directories if empty
+    // Step 3: Restore cutscene backups
     mainWindow.webContents.send('installation-progress', {
       step: 3,
       total: steps.length,
       message: steps[2],
-      percentage: 75
+      percentage: 50
+    });
+
+    const backupDir = getBackupDir(gamePath);
+    const cutsceneBackupDir = path.join(backupDir, 'Cutscene');
+    const cutsceneDir = path.join(gamePath, 'LiesofP', 'Content', 'Movies', 'Cutscene');
+
+    if (await fs.pathExists(cutsceneBackupDir)) {
+      try {
+        // Remove current cutscene files
+        if (await fs.pathExists(cutsceneDir)) {
+          await fs.remove(cutsceneDir);
+        }
+        
+        // Restore backup files
+        const backupFiles = await fs.readdir(cutsceneBackupDir);
+        for (const file of backupFiles) {
+          const backupPath = path.join(cutsceneBackupDir, file);
+          const targetPath = path.join(cutsceneDir, file);
+          await restoreBackup(backupPath, targetPath);
+        }
+        console.log('Cutscene files restored from backup');
+      } catch (error) {
+        console.warn('Could not restore cutscene backups:', error.message);
+      }
+    }
+
+    // Step 4: Restore splash backups
+    mainWindow.webContents.send('installation-progress', {
+      step: 4,
+      total: steps.length,
+      message: steps[3],
+      percentage: 67
+    });
+
+    const splashBackupDir = path.join(backupDir, 'Splash');
+    const splashDir = path.join(gamePath, 'LiesofP', 'Content', 'Movies', 'Splash');
+
+    if (await fs.pathExists(splashBackupDir)) {
+      try {
+        // Remove current splash files
+        if (await fs.pathExists(splashDir)) {
+          await fs.remove(splashDir);
+        }
+        
+        // Restore backup files
+        const backupFiles = await fs.readdir(splashBackupDir);
+        for (const file of backupFiles) {
+          const backupPath = path.join(splashBackupDir, file);
+          const targetPath = path.join(splashDir, file);
+          await restoreBackup(backupPath, targetPath);
+        }
+        console.log('Splash files restored from backup');
+      } catch (error) {
+        console.warn('Could not restore splash backups:', error.message);
+      }
+    }
+
+    // Step 5: Clean up directories if empty
+    mainWindow.webContents.send('installation-progress', {
+      step: 5,
+      total: steps.length,
+      message: steps[4],
+      percentage: 83
     });
     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -945,11 +1490,21 @@ ipcMain.handle('uninstall-dubbing', async (event, gamePath) => {
       console.log('Could not clean up mods directory:', error.message);
     }
 
-    // Step 4: Finalize
+    // Clean up backup directory after successful restoration
+    try {
+      if (await fs.pathExists(backupDir)) {
+        await fs.remove(backupDir);
+        console.log('Backup directory cleaned up:', backupDir);
+      }
+    } catch (error) {
+      console.warn('Could not clean up backup directory:', error.message);
+    }
+
+    // Step 6: Finalize
     mainWindow.webContents.send('installation-progress', {
-      step: 4,
+      step: 6,
       total: steps.length,
-      message: steps[3],
+      message: steps[5],
       percentage: 100
     });
     await new Promise(resolve => setTimeout(resolve, 500));

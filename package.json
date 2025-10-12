@@ -29,6 +29,20 @@
       "assets/**/*",
       "node_modules/**/*"
     ],
+    "asarUnpack": [
+      "assets/UnRAR.exe"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/UnRAR.exe",
+        "to": "assets/UnRAR.exe"
+      },
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["*.pak", "*.mp4", "loading.gif", "icon.ico"]
+      }
+    ],
     "win": {
       "target": "portable",
       "icon": "assets/icon.ico"

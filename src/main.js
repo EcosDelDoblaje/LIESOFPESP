@@ -371,6 +371,8 @@ async function findCommonInstallations() {
 // Download function with progress tracking using axios
 async function downloadFile(url, outputPath, onProgress) {
   const startTime = Date.now();
+  let lastUpdateTime = 0;
+  const UPDATE_INTERVAL = 2000; // 2 seconds
   
   try {
     const response = await axios({
@@ -390,11 +392,15 @@ async function downloadFile(url, outputPath, onProgress) {
 
     response.data.on('data', (chunk) => {
       downloadedBytes += chunk.length;
-      const elapsed = (Date.now() - startTime) / 1000;
-      const speed = downloadedBytes / elapsed;
-      const percentage = totalBytes ? (downloadedBytes / totalBytes) * 100 : 0;
+      const now = Date.now();
+      
+      // Only update progress every 2 seconds
+      if (onProgress && (now - lastUpdateTime >= UPDATE_INTERVAL)) {
+        lastUpdateTime = now;
+        const elapsed = (now - startTime) / 1000;
+        const speed = downloadedBytes / elapsed;
+        const percentage = totalBytes ? (downloadedBytes / totalBytes) * 100 : 0;
 
-      if (onProgress) {
         onProgress({
           downloadedBytes,
           totalBytes,
@@ -409,6 +415,19 @@ async function downloadFile(url, outputPath, onProgress) {
 
     return new Promise((resolve, reject) => {
       writer.on('finish', () => {
+        // Send final 100% update
+        if (onProgress) {
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = downloadedBytes / elapsed;
+          onProgress({
+            downloadedBytes,
+            totalBytes,
+            percentage: 100,
+            speed,
+            elapsed
+          });
+        }
+        
         writer.close();
         // Longer delay to ensure file is released
         setTimeout(resolve, 500);
@@ -434,12 +453,15 @@ async function extractRarFile(rarPath, extractPath) {
     // Ensure extract directory exists
     await fs.ensureDir(extractPath);
     
-    // Find UnRAR.exe first
+    // Find UnRAR.exe first - prioritize production paths
     const possibleUnRARPaths = [
-      path.join(process.cwd(), 'assets', 'UnRAR.exe'),
-      path.join(__dirname, '..', 'assets', 'UnRAR.exe'),
+      // Production paths (when packaged)
       path.join(process.resourcesPath, 'assets', 'UnRAR.exe'),
-      path.join(process.resourcesPath, 'app', 'assets', 'UnRAR.exe')
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'assets', 'UnRAR.exe'),
+      path.join(process.resourcesPath, 'app', 'assets', 'UnRAR.exe'),
+      // Development paths
+      path.join(__dirname, '..', 'assets', 'UnRAR.exe'),
+      path.join(process.cwd(), 'assets', 'UnRAR.exe')
     ];
     
     let unrarPath = null;

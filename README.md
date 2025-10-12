@@ -78,8 +78,6 @@ Este repositorio contiene:
 
 - **Scripts y herramientas** originales desarrollados por Ecos del Doblaje.
 - **Audios originales grabados por Ecos del Doblaje y sus actores de voz**. Los nombres de los archivos corresponden a los nombres originales del juego Lies of P, pero el contenido es totalmente nuevo y grabado expresamente para este proyecto. No se incluye ningún audio original del juego.
-- **Texturas originales de Neowiz Games editadas** por Ecos del Doblaje para su traducción al español.
-
 ---
 
 ### Sobre los scripts y audios grabados
@@ -87,12 +85,6 @@ Este repositorio contiene:
 El código y los audios grabados por Ecos del Doblaje y sus actores de voz son propiedad de sus autores.  
 **No se autoriza su uso, copia, modificación ni redistribución sin permiso expreso.**  
 Todos los derechos reservados.
-
-### Sobre las texturas editadas
-
-Las texturas y materiales visuales originales son propiedad de Neowiz Games y Round8 Studio.  
-Las texturas incluidas en este repositorio han sido editadas únicamente para fines de traducción y modificación en el contexto de este mod fan, sin ánimo de lucro.  
-**No se concede permiso para utilizar, modificar, distribuir ni reutilizar estas texturas fuera de este proyecto.**
 
 ---
 

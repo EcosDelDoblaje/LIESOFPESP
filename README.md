@@ -70,7 +70,7 @@ Si encuentras algún problema:
 - **Hugo:** [Jordi Masana](https://www.instagram.com/jmasana7)
 - **Hombre Infectado:** [Mario Murillo](https://www.instagram.com/murillo.dub/?hl=es)
 - **Julian el Caballero:** [Jorge Lindell](https://www.instagram.com/milksamurai/)
-- **Marioneta Sola:** [Alejandro Navas](https://www.instagram.com/pedro_duran_jose)
+- **Marioneta Sola:** [Alejandro Navas](#)
 - **Lucio:** [Diego Serrano](https://www.instagram.com/d_de_dub/)
 - **Burro Loco:** [Isaac Martín](https://www.instagram.com/voiceofdante/)
 - **Mercader Ambulante:** [Alex Yro](https://www.instagram.com/alex.yro.dub)

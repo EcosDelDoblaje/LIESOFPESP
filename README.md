@@ -111,7 +111,7 @@ Si encuentras algún problema:
 - **Rosaura:** [Eva María Rojas](https://www.youtube.com/@EvamaDubs)
 - **Salao:** [Perfecto Artola](https://www.youtube.com/@odaalfrikismoconperfectus)
 - **Barrendero:** [Daniel Oñate Cabrerizo](https://www.instagram.com/monamidubs/)
-- **Véronique:* [Jenelle García](https://www.instagram.com/jenellegarcia.voz/)
+- **Véronique:** [Jenelle García](https://www.instagram.com/jenellegarcia.voz/)
 
 ### 🎙️ Canciones
 

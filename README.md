@@ -65,7 +65,7 @@ Si encuentras algún problema:
 - **Géminis:** [Minerva](https://www.instagram.com/fenix_dubs/)
 - **Geppetto:** [Antonio Jesús Vázquez](https://www.youtube.com/@doblandros)
 - **Giangio:** [Jaume Casanovas](https://www.instagram.com/jaume.cr_doblatge/)
-- **Ermitaño:* [Carlos Barquero](https://www.instagram.com/carlosbv_01/)
+- **Ermitaño:** [Carlos Barquero](https://www.instagram.com/carlosbv_01/)
 - **Puerta del Hotel:** [Jose Rizo](https://www.instagram.com/jose.a.rizo/)
 - **Hugo:** [Jordi Masana](https://www.instagram.com/jmasana7)
 - **Hombre Infectado:** [Mario Murillo](https://www.instagram.com/murillo.dub/?hl=es)

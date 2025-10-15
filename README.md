@@ -123,11 +123,11 @@ Si encuentras algún problema:
 - **Clear Blue Sky:** [Jenelle García](https://www.instagram.com/jenellegarcia.voz/)
 - **Fascination:** [BiBi Rodríguez](https://www.instagram.com/bibi.rodriguez._/)
 - **Feel:** [Miryamkmu](https://www.instagram.com/miryamkmu)
-- ** Proposal, flower, wolf part 1:** [Silve](https://x.com/SilveOfisialVA)
+- **Proposal, flower, wolf part 1:** [Silve](https://x.com/SilveOfisialVA)
 - **Quixotic:** [Eva María Rojas](https://www.youtube.com/@EvamaDubs)
 - **Shadow Flower:** [Aleshuki](https://www.tiktok.com/@fukikae_)
 - **Someday:** [Jaume Casanovas](https://www.instagram.com/jaume.cr_doblatge/)
-- *Survivor:** [Katsuro Senk](https://www.instagram.com/katsuro_senk)
+- **Survivor:** [Katsuro Senk](https://www.instagram.com/katsuro_senk)
 
 ## 👥 Equipo
 

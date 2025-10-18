@@ -97,7 +97,7 @@ Si encuentras algún problema:
 - **Dama Blanca:** [YukiAisaka](https://www.instagram.com/sedka_/?hl=es)
 - **Joven Carlo:** [Rosa Rodero López](https://www.instagram.com/__azulpetroleo_)
 - **Alex Cerebro:** [Christian Apellániz Barradas](https://www.youtube.com/@ToDobla2)
-- **El Rastrador:** [Santiago Rivas] (https://www.instagram.com/santiagorivaslocutor/)
+- **El Rastrador:** [Santiago Rivas](https://www.instagram.com/santiagorivaslocutor/)
 - **Hombre Ensangrentado:** [Jose Rizo]( https://www.instagram.com/jose.a.rizo/)
 - **Carcasa Coronada:** [Joaquín Martínez](https://youtube.com/@joaquinmartinezdob5412)
 - **Marioneta Destrozada:** [Blanca Palacios Pérez](https://www.instagram.com/_blancaa.p__?igsh=ZDFmcmx0YzFjMXVj)
